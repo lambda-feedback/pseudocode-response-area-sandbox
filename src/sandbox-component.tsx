@@ -1,6 +1,6 @@
 import { ThemeProvider } from '@styles/minimal/theme-provider'
 
-import { PseudocodeResponseAreaTub } from './types/Pseudocode/index.tsx'
+import { PseudocodeResponseAreaTub } from './types/Pseudocode'
 
 function ResponseAreaInputWrapper({ children }: { children: React.ReactNode }) {
   return <ThemeProvider>{children}</ThemeProvider>

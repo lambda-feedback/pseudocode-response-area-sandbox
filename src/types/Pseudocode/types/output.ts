@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { TestCaseResultSchema } from './tests';
+
 /* ============================================================
  * Shared / External Types
  * ============================================================
@@ -328,62 +330,52 @@ export const ComplexityAnalysisSchema = z.object({
 export type ComplexityAnalysis = z.infer<typeof ComplexityAnalysisSchema>;
 
 /* ============================================================
- * EvaluationResult (Main Output)
+ * CodeCorrectnessResult
  * ============================================================
  */
 
-export const EvaluationResultSchema = z.object({
-  is_correct: z
-    .boolean()
-    .describe('Overall correctness of the submission'),
+export const CodeCorrectnessResultSchema = z.object({
+  parse_success: z.boolean(),
 
-  time_complexity_result: TimeComplexityResultSchema
-    .optional()
-    .describe('Time complexity evaluation details'),
+  parse_errors: z
+    .array(z.string())
+    .default([]),
 
-  space_complexity_result: SpaceComplexityResultSchema
-    .optional()
-    .describe('Space complexity evaluation details'),
+  parse_warnings: z
+    .array(z.string())
+    .default([]),
 
-  score: z
-    .number()
-    .min(0)
-    .max(1)
-    .default(0)
-    .describe('Numerical score from 0 to 1'),
-
-  analysis: ComplexityAnalysisSchema
-    .optional()
-    .describe('Detailed complexity analysis from pseudocode'),
-
-  ast: ProgramNodeSchema
-    .optional()
-    .describe('Parsed AST (only included if show_ast is True)'),
-
-  feedback: z
+  normalized_code: z
     .string()
-    .default('')
-    .describe('Overall feedback message'),
+    .optional(),
 
-  feedback_items: z
-    .array(FeedbackItemSchema)
-    .default([])
-    .describe('List of specific feedback items'),
+  execution_results: z
+    .array(TestCaseResultSchema)
+    .default([]),
 
-  warnings: z
-    .array(z.string())
-    .default([])
-    .describe('Non-fatal warnings during evaluation'),
+  is_correct: z.boolean(),
 
-  errors: z
-    .array(z.string())
-    .default([])
-    .describe('Errors encountered during evaluation'),
+  feedback: z.string(),
+});
 
-  metadata: z
-    .record(z.any())
-    .default({})
-    .describe('Additional metadata about the evaluation'),
+export type CodeCorrectnessResult = z.infer<typeof CodeCorrectnessResultSchema>;
+
+
+export const SectionFeedbackSchema = z.object({
+  importance: z.string(),
+  title: z.string(),
+  content: z.string(),
+});
+
+export type SectionFeedback = z.infer<typeof SectionFeedbackSchema>;
+
+export const EvaluationResultSchema = z.object({
+  is_correct: z.boolean(),
+  overall_message: z.string(),
+  time_complexity: TimeComplexityResultSchema.optional(),
+  space_complexity: SpaceComplexityResultSchema.optional(),
+  test_cases: z.array(TestCaseResultSchema).default([]),
+  detailed_sections: z.array(SectionFeedbackSchema).default([]),
 });
 
 export type EvaluationResult = z.infer<typeof EvaluationResultSchema>;

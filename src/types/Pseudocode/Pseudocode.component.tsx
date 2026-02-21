@@ -1,4 +1,4 @@
-import { foldGutter, foldService, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
+import { foldGutter, foldService, syntaxHighlighting } from '@codemirror/language';
 import { EditorState } from '@codemirror/state';
 import { placeholder } from '@codemirror/view';
 import { EditorView, basicSetup } from 'codemirror';
@@ -6,42 +6,48 @@ import { useEffect, useRef, useState } from 'react';
 
 import { BaseResponseAreaProps } from '../base-props.type';
 
+import { PseudocodeFeedbackPanel } from './components/PseudocodeFeedbackPanel';
 import { autoIndentAfterColon } from './plugins/autoIndent';
 import { pseudocodeFoldFunc } from './plugins/fold';
 import { pseudocodeHighlightStyle } from './plugins/highlight';
 import { pseudocodeLanguage } from './plugins/language';
 import { pseudocodeTheme } from './plugins/pseudocode.theme';
 import { StudentResponse } from './types/input';
-import { defaultStudentResponse } from './utils/consts';
+// import { defaultStudentResponse } from './utils/consts';
+import { EvaluationResult } from './types/output';
 import { usePseudocodeStyles } from './utils/styles';
 
-type PseudocodeInputProps = Omit<BaseResponseAreaProps, 'handleChange' | 'answer'> & {
+type PseudocodeInputProps = Omit<BaseResponseAreaProps, 'handleChange' | 'answer' | 'feedback'> & {
   handleChange: (val: StudentResponse) => void;
-  answer?: StudentResponse;
+  answer?: StudentResponse; // optional, only used for initial load
+  // callAPI: () => void;
+  feedback: EvaluationResult | null;
 };
 
 export const PseudocodeInput: React.FC<PseudocodeInputProps> = ({
   handleChange,
-  answer,
+  // callAPI,
+  feedback,
 }) => {
   const { classes } = usePseudocodeStyles();
-  const [internalAnswer, setInternalAnswer] = useState<StudentResponse>(answer ?? defaultStudentResponse);
+
+  // Internal state fully managed in this component
+  const [internalAnswer, setInternalAnswer] = useState<StudentResponse>({
+    pseudocode: '',
+    time_complexity: '',
+    space_complexity: '',
+    explanation: '',
+  });
 
   const editorRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
 
-  // Sync external answer only when it changes
-  useEffect(() => {
-    if (!answer) return;
-    setInternalAnswer(answer);
-  }, [answer]);
-
-  // Initialize CodeMirror
+  // Initialize CodeMirror once
   useEffect(() => {
     if (!editorRef.current) return;
 
     const state = EditorState.create({
-      doc: internalAnswer.pseudocode ?? '',
+      doc: internalAnswer.pseudocode,
       extensions: [
         foldGutter(),
         foldService.of(pseudocodeFoldFunc),
@@ -54,7 +60,11 @@ export const PseudocodeInput: React.FC<PseudocodeInputProps> = ({
         EditorView.updateListener.of((update) => {
           if (!update.docChanged) return;
           const newCode = update.state.doc.toString();
-          setInternalAnswer((prev) => ({ ...prev, pseudocode: newCode }));
+          setInternalAnswer((prev) => {
+            const updated = { ...prev, pseudocode: newCode };
+            handleChange(updated); // notify parent immediately
+            return updated;
+          });
         }),
         EditorView.theme({
           '&': { height: '100%' },
@@ -73,45 +83,59 @@ export const PseudocodeInput: React.FC<PseudocodeInputProps> = ({
       view.destroy();
       viewRef.current = null;
     };
-  }, []);
+  }, []); // only runs once
 
-  // Debounced / onBlur submit
-  const reportChange = () => {
-    handleChange({
-      pseudocode: internalAnswer.pseudocode ?? '',
-      time_complexity: internalAnswer.time_complexity ?? null,
-      space_complexity: internalAnswer.space_complexity ?? null,
-      explanation: internalAnswer.explanation ?? null,
+  // Report change for complexity/explanation fields
+  const handleFieldChange = (field: keyof StudentResponse, value: string) => {
+    setInternalAnswer((prev) => {
+      const updated = { ...prev, [field]: value };
+      handleChange(updated); // immediate update to parent
+      return updated;
     });
   };
 
   return (
     <div className={classes.root}>
-      <div ref={editorRef} className={classes.editor} />
+      {/* ================= Editor ================= */}
+      <div className={classes.editorWrapper}>
+        <div ref={editorRef} className={classes.editor} />
+      </div>
 
-      <input
-        className={classes.field}
-        value={internalAnswer.time_complexity ?? ''}
-        placeholder="Time Complexity"
-        onChange={(e) => setInternalAnswer((prev) => ({ ...prev, time_complexity: e.target.value }))}
-        onBlur={reportChange}
-      />
+      {/* ================= Complexity Inputs ================= */}
+      <div className={classes.complexityRow}>
+        <input
+          className={classes.field}
+          value={internalAnswer.time_complexity ?? ''}
+          placeholder="Time Complexity (e.g. O(n log n))"
+          onChange={(e) => handleFieldChange('time_complexity', e.target.value)}
+        />
+        <input
+          className={classes.field}
+          value={internalAnswer.space_complexity ?? ''}
+          placeholder="Space Complexity (e.g. O(n))"
+          onChange={(e) => handleFieldChange('space_complexity', e.target.value)}
+        />
+      </div>
 
-      <input
-        className={classes.field}
-        value={internalAnswer.space_complexity ?? ''}
-        placeholder="Space Complexity"
-        onChange={(e) => setInternalAnswer((prev) => ({ ...prev, space_complexity: e.target.value }))}
-        onBlur={reportChange}
-      />
-
+      {/* ================= Explanation ================= */}
       <textarea
         className={classes.textarea}
         value={internalAnswer.explanation ?? ''}
-        placeholder="Explanation"
-        onChange={(e) => setInternalAnswer((prev) => ({ ...prev, explanation: e.target.value }))}
-        onBlur={reportChange}
+        placeholder="Explain your reasoning (optional)"
+        onChange={(e) => handleFieldChange('explanation', e.target.value)}
       />
+
+      {/* ================= Action =================
+      <button onClick={callAPI}>
+        Check Answer
+      </button> */}
+
+      {/* ================= Feedback ================= */}
+      {feedback && (
+        <div className={classes.feedbackPanel}>
+          <PseudocodeFeedbackPanel result={feedback} />
+        </div>
+      )}
     </div>
   );
 };
