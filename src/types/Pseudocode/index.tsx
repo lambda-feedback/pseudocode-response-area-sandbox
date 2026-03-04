@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import z from 'zod'
 
 import {
   BaseResponseAreaProps,
@@ -27,12 +26,14 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
 
   /* -------------------- Schemas -------------------- */
 
-  protected answerSchema = z.any();//StudentResponseSchema
+  // note to whoever wants to change this
+  // since the lambda feedback sandbox stores the answer and run extractAnswer by default
+  // when you change the schema there is a chance that the stored answer cannot be parsed, so you see the whole page errors
+  // solution: change this to z.any() temporary, change the stored answer and change this back
+  protected answerSchema = StudentResponseSchema
   protected answer: ExpectedAnswer = defaultExpectedAnswer
 
   /* -------------------- Internal State -------------------- */
-
-  private previewFeedback: EvaluationResult | null = null
 
   public readonly delegateFeedback = false
   public readonly delegateLivePreview = true
@@ -58,16 +59,6 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
       : defaultExpectedAnswer
   }
 
-  /* -------------------- Custom Check -------------------- */
-
-  customCheck = () => {
-    if (this.previewFeedback) {
-      throw new Error('preview failed')
-    }
-
-    this.previewFeedback = null
-  }
-
   /* =====================================================
    * Student Input
    * ===================================================== */
@@ -80,19 +71,21 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
     const validAnswer = parsed.success
       ? parsed.data
       : defaultStudentResponse
-    // console.log("feedback prop:", props.feedback)
-
+      
     const submittedFeedback: EvaluationResult | null =
-      props.feedback?.feedback ? JSON.parse((props.feedback?.feedback as string).split("<br />")[1] ?? "{}") : null
-
-    const effectiveFeedback =
-      this.previewFeedback ?? submittedFeedback
+      props.feedback &&
+      'feedback' in props.feedback &&
+      props.feedback.feedback
+        ? JSON.parse(
+            (props.feedback.feedback as string).split('<br />')[1] ?? '{}'
+          )
+        : null;
 
     return (
       <PseudocodeInput
         {...props}
         answer={validAnswer}
-        feedback={effectiveFeedback}
+        feedback={submittedFeedback}
         handleChange={(val: StudentResponse) => {
           props.handleChange(val)
         }}

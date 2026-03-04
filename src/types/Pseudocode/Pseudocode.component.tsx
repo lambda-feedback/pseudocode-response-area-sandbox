@@ -19,25 +19,19 @@ import { usePseudocodeStyles } from './utils/styles';
 
 type PseudocodeInputProps = Omit<BaseResponseAreaProps, 'handleChange' | 'answer' | 'feedback'> & {
   handleChange: (val: StudentResponse) => void;
-  answer?: StudentResponse; // optional, only used for initial load
-  // callAPI: () => void;
   feedback: EvaluationResult | null;
+  answer: StudentResponse
 };
 
 export const PseudocodeInput: React.FC<PseudocodeInputProps> = ({
   handleChange,
-  // callAPI,
   feedback,
+  answer
 }) => {
   const { classes } = usePseudocodeStyles();
 
   // Internal state fully managed in this component
-  const [internalAnswer, setInternalAnswer] = useState<StudentResponse>({
-    pseudocode: '',
-    time_complexity: '',
-    space_complexity: '',
-    explanation: '',
-  });
+  const [internalAnswer, setInternalAnswer] = useState<StudentResponse>(answer);
 
   const editorRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);

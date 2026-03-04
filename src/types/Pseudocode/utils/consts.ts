@@ -9,7 +9,7 @@ export const defaultStudentResponse: StudentResponse = {
 };
 
 export const defaultExpectedAnswer: ExpectedAnswer = {
-  expected_time_complexity: '',
+  expected_time_complexity: 'O(1)',
   expected_space_complexity: 'O(1)',
   eval_options: {
     require_time_complexity: true,
