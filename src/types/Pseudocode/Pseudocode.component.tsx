@@ -28,6 +28,7 @@ export const PseudocodeInput: React.FC<PseudocodeInputProps> = ({
   feedback,
   answer
 }) => {
+  console.log(answer)
   const { classes } = usePseudocodeStyles();
 
   // Internal state fully managed in this component

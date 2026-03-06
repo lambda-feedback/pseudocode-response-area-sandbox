@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import z from 'zod'
 
 import {
   BaseResponseAreaProps,
@@ -26,14 +27,26 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
 
   /* -------------------- Schemas -------------------- */
 
-  // note to whoever wants to change this
-  // since the lambda feedback sandbox stores the answer and run extractAnswer by default
-  // when you change the schema there is a chance that the stored answer cannot be parsed, so you see the whole page errors
-  // solution: change this to z.any() temporary, change the stored answer and change this back
-  protected answerSchema = StudentResponseSchema
+  // Wizard forces answer to be a string, so we parse before validating
+  protected answerSchema = z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        try {
+          return JSON.parse(val)
+        } catch {
+          return val
+        }
+      }
+      return val
+    },
+    ExpectedAnswerSchema
+  )
+
   protected answer: ExpectedAnswer = defaultExpectedAnswer
 
   /* -------------------- Internal State -------------------- */
+
+  private previewFeedback: EvaluationResult | null = null
 
   public readonly delegateFeedback = false
   public readonly delegateLivePreview = true
@@ -43,7 +56,6 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
   initWithConfig = (config: any) => {
     let raw = config?.answer
 
-    // 🔥 Because Wizard stringifies, we must parse here
     if (typeof raw === 'string') {
       try {
         raw = JSON.parse(raw)
@@ -59,6 +71,16 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
       : defaultExpectedAnswer
   }
 
+  /* -------------------- Custom Check -------------------- */
+
+  customCheck = () => {
+    if (this.previewFeedback) {
+      throw new Error('preview failed')
+    }
+
+    this.previewFeedback = null
+  }
+
   /* =====================================================
    * Student Input
    * ===================================================== */
@@ -66,12 +88,13 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
   public InputComponent = (
     props: BaseResponseAreaProps,
   ): JSX.Element => {
-    const parsed = this.answerSchema.safeParse(props.answer)
+
+    const parsed = StudentResponseSchema.safeParse(props.answer)
 
     const validAnswer = parsed.success
       ? parsed.data
       : defaultStudentResponse
-      
+
     const submittedFeedback: EvaluationResult | null =
       props.feedback &&
       'feedback' in props.feedback &&
@@ -79,15 +102,18 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
         ? JSON.parse(
             (props.feedback.feedback as string).split('<br />')[1] ?? '{}'
           )
-        : null;
+        : null
+
+    const effectiveFeedback =
+      this.previewFeedback ?? submittedFeedback
 
     return (
       <PseudocodeInput
         {...props}
         answer={validAnswer}
-        feedback={submittedFeedback}
+        feedback={effectiveFeedback}
         handleChange={(val: StudentResponse) => {
-          props.handleChange(val)
+          props.handleChange(JSON.stringify(val))
         }}
       />
     )
@@ -97,7 +123,10 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
    * Wizard / Teacher Input
    * ===================================================== */
 
-  public WizardComponent = (props: BaseResponseAreaWizardProps): JSX.Element => {
+  public WizardComponent = (
+    props: BaseResponseAreaWizardProps,
+  ): JSX.Element => {
+
     const [localAnswer, setLocalAnswer] = useState(this.answer)
 
     return (
@@ -106,13 +135,14 @@ export class PseudocodeResponseAreaTub extends ResponseAreaTub {
         handleChange={(val) => {
           setLocalAnswer(val)
           this.answer = val
+
           props.handleChange({
             responseType: this.responseType,
+            // Wizard only supports string answers
             answer: JSON.stringify(val),
           })
         }}
       />
     )
   }
-
 }
